@@ -1,6 +1,6 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg trace_id=%X{trace_id} span_id=%X{span_id}%n"/>
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg trace_id=%X{traceId} span_id=%X{spanId}%n"/>
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
 
     <springProperty scope="context" name="GRAYLOG_HOST" source="GRAYLOG_HOST" defaultValue="graylog"/>
@@ -14,7 +14,7 @@
         <extractStackTrace>true</extractStackTrace>
         <filterStackTrace>true</filterStackTrace>
         <includeFullMDC>true</includeFullMDC>
-        <additionalFields>service=spring-otel-demo,trace_id=%X{trace_id},span_id=%X{span_id}</additionalFields>
+        <additionalFields>service=spring-otel-demo,trace_id=%X{traceId},span_id=%X{spanId}</additionalFields>
     </appender>
 
     <root level="INFO">
