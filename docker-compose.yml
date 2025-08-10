@@ -1,0 +1,153 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Nom d'app Spring (utile dans traces/metrics)
+      SPRING_APPLICATION_NAME: spring-otel-demo
+
+      # Micrometer Tracing → OTLP (Collector HTTP 4318 interne)
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+
+      # Logs Graylog (GELF via logback-spring.xml)
+      GRAYLOG_HOST: graylog
+      GRAYLOG_PORT: 12201
+    depends_on:
+      otel-collector:
+        condition: service_started
+      graylog:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks: [observ]
+    restart: unless-stopped
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=VeryStr0ng@P@ssw0rd!2025
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks: [observ]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+  mongodb:
+    image: mongo:6.0
+    volumes:
+      - mongo-data:/data/db
+    networks: [observ]
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  graylog:
+    image: graylog/graylog:5.2
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      GRAYLOG_PASSWORD_SECRET: "thisIsASuperSecretPasswordChangeMe"
+      GRAYLOG_ROOT_PASSWORD_SHA2: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918" # = 'admin'
+      GRAYLOG_HTTP_EXTERNAL_URI: "http://localhost:9000/"
+      GRAYLOG_ELASTICSEARCH_HOSTS: "http://opensearch:9200"
+      GRAYLOG_MONGODB_URI: "mongodb://mongodb:27017/graylog"
+    ports:
+      - "9000:9000"
+      - "12201:12201/udp"
+    networks: [observ]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/api/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks: [observ]
+    restart: unless-stopped
+
+  # Tempo (traces)
+  tempo:
+    image: grafana/tempo:2.4.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    expose:
+      - "3200"
+      - "4317"
+      - "4318"
+    networks: [observ]
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.99.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    expose:
+      - "4317"
+      - "4318"
+      - "9464"
+    depends_on:
+      tempo:
+        condition: service_started
+      graylog:
+        condition: service_healthy
+    networks: [observ]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"   # UI Grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - prometheus
+      - tempo
+    networks: [observ]
+    restart: unless-stopped
+
+volumes:
+  opensearch-data:
+  mongo-data:
+  tempo-data:
+  grafana-data:
+
+networks:
+  observ:
+    driver: bridge

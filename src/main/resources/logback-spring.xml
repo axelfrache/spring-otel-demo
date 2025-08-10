@@ -1,0 +1,24 @@
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg trace_id=%X{trace_id} span_id=%X{span_id}%n"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <springProperty scope="context" name="GRAYLOG_HOST" source="GRAYLOG_HOST" defaultValue="graylog"/>
+    <springProperty scope="context" name="GRAYLOG_PORT" source="GRAYLOG_PORT" defaultValue="12201"/>
+
+    <appender name="GELF" class="biz.paluch.logging.gelf.logback.GelfLogbackAppender">
+        <host>${GRAYLOG_HOST}</host>
+        <port>${GRAYLOG_PORT}</port>
+        <version>1.1</version>
+        <facility>spring-otel-demo</facility>
+        <extractStackTrace>true</extractStackTrace>
+        <filterStackTrace>true</filterStackTrace>
+        <includeFullMDC>true</includeFullMDC>
+        <additionalFields>service=spring-otel-demo,trace_id=%X{trace_id},span_id=%X{span_id}</additionalFields>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="GELF"/>
+    </root>
+</configuration>
