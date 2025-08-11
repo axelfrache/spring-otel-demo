@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,7 +7,14 @@
 </head>
 <body>
 <h1>Spring + Thymeleaf + OTEL</h1>
+
 <p>Résultat service: <strong th:text="${result}">OK</strong></p>
+
+<form th:action="@{/trace}" method="post">
+    <button type="submit">Générer une trace</button>
+</form>
+<p th:if="${message}" th:text="${message}" style="color:green"></p>
+
 <p><a href="/actuator/health">/actuator/health</a> • <a href="/actuator">/actuator</a></p>
 </body>
 </html>
