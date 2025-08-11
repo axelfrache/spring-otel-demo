@@ -1,4 +1,3 @@
-// src/main/java/.../controller/HomeController.java
 package me.axelfrache.springoteldemo.controller;
 
 import me.axelfrache.springoteldemo.service.DemoService;
